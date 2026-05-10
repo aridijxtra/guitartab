@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MelodyTab — Melodie naar Gitaar Tabulatie</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Lato:wght@300;400;700&display=swap');
+
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1a1916;
+    --surface2: #232219;
+    --border: #333228;
+    --accent: #d4a847;
+    --accent2: #8fbf6a;
+    --text: #f0ead6;
+    --muted: #7a7260;
+    --string1: #d4a847;
+    --string2: #c9966a;
+    --string3: #8fbf6a;
+    --string4: #6aabcf;
+    --string5: #b08fc9;
+    --string6: #c96a80;
+    --danger: #e05555;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lato', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  .app {
+    position: relative; z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  header {
+    text-align: center;
+    padding: 2rem 0 2.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.8rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+    margin-bottom: 0.4rem;
+  }
+
+  header p {
+    font-size: 0.95rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .fret-deco {
+    display: flex; justify-content: center; gap: 3px; margin-top: 1rem;
+  }
+  .fret-deco span {
+    display: block;
+    height: 1px;
+    background: var(--border);
+  }
+  .fret-deco span:nth-child(1) { width: 30px; }
+  .fret-deco span:nth-child(2) { width: 60px; background: var(--accent); opacity: 0.5; }
+  .fret-deco span:nth-child(3) { width: 30px; }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: var(--accent);
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 1.2rem;
+  }
+
+  .btn {
+    font-family: 'Lato', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    padding: 0.6rem 1.4rem;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-record {
+    background: #c94040;
+    color: #fff;
+    box-shadow: 0 0 0 0 rgba(201,64,64,0);
+  }
+  .btn-record.recording {
+    animation: pulse-rec 1.2s infinite;
+  }
+  @keyframes pulse-rec {
+    0%,100% { box-shadow: 0 0 0 0 rgba(201,64,64,0.6); }
+    50% { box-shadow: 0 0 0 8px rgba(201,64,64,0); }
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0f0e0c;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-success {
+    background: var(--accent2);
+    color: #0f0e0c;
+  }
+
+  .status {
+    font-size: 0.8rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .dot.active { background: #e05555; animation: blink 1s infinite; }
+  .dot.ready { background: var(--accent2); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .visualizer-wrap {
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin-top: 1rem;
+  }
+  canvas#waveform {
+    display: block;
+    width: 100%;
+    height: 70px;
+  }
+
+  .pitch-display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .pitch-note {
+    font-size: 1.4rem;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  /* TAB DISPLAY */
+  .tab-container {
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .tab-grid {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+    line-height: 1;
+    display: inline-block;
+    min-width: 100%;
+  }
+
+  .tab-row {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    margin-bottom: 2px;
+  }
+
+  .tab-label {
+    width: 28px;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-align: right;
+    padding-right: 6px;
+  }
+
+  .tab-line {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  .tab-line::before {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .tab-beat {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 24px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .fret-num {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    min-width: 22px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .fret-num:hover { border-color: var(--accent); }
+  .fret-num.active { background: var(--accent); color: #0f0e0c; border-color: var(--accent); }
+  .fret-num.playing { background: var(--accent2); color: #0f0e0c; border-color: var(--accent2); }
+  .dash {
+    color: var(--border);
+    font-size: 0.8rem;
+    user-select: none;
+    width: 22px;
+    text-align: center;
+  }
+
+  .tab-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1.2rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  /* PLAYBACK */
+  .playback-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1rem;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  .bpm-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .bpm-group input[type=range] {
+    width: 80px;
+    accent-color: var(--accent);
+  }
+  .bpm-val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    font-size: 0.85rem;
+    min-width: 36px;
+  }
+
+  /* TUNING */
+  .tuning-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .tuning-row select {
+    font-size: 0.78rem;
+    padding: 0.3rem 0.5rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .string-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .info-bar {
+    display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+  }
+  .info-chip {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .info-chip span { color: var(--accent); }
+
+  .empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .empty-state .icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.4;
+  }
+
+  /* EDIT OVERLAY */
+  .fret-edit-tip {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.8rem;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    header h1 { font-size: 2rem; }
+    .app { padding: 1rem; }
+  }
+
+  /* PDF hidden canvas */
+  #pdfCanvas { display: none; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="app">
+
+  <header>
+    <h1>MelodyTab</h1>
+    <p>Zing of speel een melodie — ontvang gitaar tabulatie</p>
+    <div class="fret-deco">
+      <span></span><span></span><span></span>
+    </div>
+  </header>
+
+  <!-- INSTELLINGEN -->
+  <div class="section">
+    <div class="section-title">Gitaar Stemming</div>
+    <div class="tuning-row" id="tuningRow"></div>
+    <div style="font-size:0.78rem; color:var(--muted);">Snaar 1 (hoogst) t/m snaar 6 (laagst)</div>
+  </div>
+
+  <!-- OPNAME -->
+  <div class="section">
+    <div class="section-title">Opname</div>
+    <div class="controls">
+      <button class="btn btn-record" id="btnRecord" onclick="toggleRecord()">
+        <span id="recIcon">●</span>
+        <span id="recLabel">Start Opname</span>
+      </button>
+      <div class="status">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">Klaar om op te nemen</span>
+      </div>
+    </div>
+    <div class="visualizer-wrap">
+      <canvas id="waveform"></canvas>
+      <div class="pitch-display">
+        <div>
+          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:2px;">GEDETECTEERDE NOOT</div>
+          <div class="pitch-note" id="pitchNote">—</div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:2px;">FREQUENTIE</div>
+          <div id="pitchFreq" style="font-family:'JetBrains Mono'; color:var(--muted);">— Hz</div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:2px;">SNAAR / FRET</div>
+          <div id="pitchFret" style="font-family:'JetBrains Mono'; color:var(--accent2);">— / —</div>
+        </div>
+        <div>
+          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:2px;">NOTEN GEVANGEN</div>
+          <div id="noteCount" style="font-family:'JetBrains Mono'; color:var(--accent);">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABULATIE -->
+  <div class="section">
+    <div class="section-title">Tabulatie</div>
+
+    <div class="playback-bar">
+      <button class="btn btn-primary" id="btnPlay" onclick="togglePlay()" disabled>▶ Afspelen</button>
+      <button class="btn btn-secondary" onclick="clearTab()">✕ Wis</button>
+      <div class="bpm-group">
+        BPM
+        <input type="range" min="40" max="240" value="90" id="bpmSlider" oninput="updateBPM()">
+        <span class="bpm-val" id="bpmVal">90</span>
+      </div>
+    </div>
+
+    <div id="tabDisplay">
+      <div class="empty-state">
+        <div class="icon">🎸</div>
+        <div>Neem een melodie op om tabulatie te genereren</div>
+        <div style="margin-top:0.5rem; font-size:0.78rem;">Of klik op <strong style="color:var(--accent)">Demo laden</strong> om een voorbeeld te zien</div>
+      </div>
+    </div>
+
+    <div class="fret-edit-tip" id="editTip" style="display:none">
+      💡 Klik op een fret-getal om het handmatig aan te passen
+    </div>
+
+    <div class="tab-actions">
+      <button class="btn btn-secondary" onclick="loadDemo()">🎵 Demo laden</button>
+      <button class="btn btn-success" id="btnPDF" onclick="exportPDF()" disabled>⬇ Exporteer als PDF</button>
+      <button class="btn btn-secondary" id="btnTXT" onclick="exportTXT()" disabled>📋 Kopieer ASCII-tab</button>
+    </div>
+  </div>
+
+</div>
+
+<canvas id="pdfCanvas"></canvas>
+
+<script>
+// =============================================
+//  TUNING SETUP
+// =============================================
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const NOTE_NAMES_NL = { 'C':'C','C#':'C#','D':'D','D#':'D#','E':'E','F':'F','F#':'F#','G':'G','G#':'G#','A':'A','A#':'A#','B':'B' };
+
+// Standard tuning (MIDI note numbers for open strings, string 1=e4, 6=E2)
+const STANDARD_TUNING = [64, 59, 55, 50, 45, 40]; // e4 B3 G3 D3 A2 E2
+
+let tuning = [...STANDARD_TUNING];
+const STRING_LABELS = ['e','B','G','D','A','E'];
+const STRING_COLORS = ['var(--string1)','var(--string2)','var(--string3)','var(--string4)','var(--string5)','var(--string6)'];
+
+function midiToName(midi) {
+  return NOTES[midi % 12] + Math.floor(midi/12 - 1);
+}
+
+function buildTuningUI() {
+  const row = document.getElementById('tuningRow');
+  row.innerHTML = '';
+  STANDARD_TUNING.forEach((base, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'string-label';
+    wrap.style.color = STRING_COLORS[i];
+    wrap.innerHTML = `<span>${STRING_LABELS[i]}</span>`;
+    const sel = document.createElement('select');
+    for (let n = -3; n <= 3; n++) {
+      const opt = document.createElement('option');
+      const midi = base + n;
+      opt.value = midi;
+      opt.textContent = midiToName(midi);
+      if (n === 0) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    sel.onchange = () => { tuning[i] = parseInt(sel.value); if(tabNotes.length) renderTab(); };
+    wrap.appendChild(sel);
+    row.appendChild(wrap);
+  });
+}
+buildTuningUI();
+
+// =============================================
+//  PITCH DETECTION (YIN-like autocorrelation)
+// =============================================
+let audioCtx, analyser, source, stream;
+let isRecording = false;
+let animFrame;
+let capturedNotes = [];
+let lastNote = null;
+let lastNoteTime = 0;
+let noteBuffer = [];
+let tabNotes = [];
+
+function midiFromFreq(freq) {
+  if (!freq || freq < 50) return null;
+  return Math.round(12 * Math.log2(freq / 440) + 69);
+}
+
+function detectPitch(buffer, sampleRate) {
+  const SIZE = buffer.length;
+  const MAX_SAMPLES = Math.floor(SIZE / 2);
+  let best_offset = -1;
+  let best_corr = 0;
+  let rms = 0;
+  for (let i = 0; i < SIZE; i++) rms += buffer[i] * buffer[i];
+  rms = Math.sqrt(rms / SIZE);
+  if (rms < 0.005) return null;
+
+  // Autocorrelation
+  const corr = new Float32Array(MAX_SAMPLES);
+  for (let i = 0; i < MAX_SAMPLES; i++) {
+    let val = 0;
+    for (let j = 0; j < MAX_SAMPLES; j++) val += buffer[j] * buffer[j+i];
+    corr[i] = val;
+  }
+
+  // Find first dip then peak
+  let min_i = 0;
+  for (let i = 1; i < MAX_SAMPLES; i++) {
+    if (corr[i] < corr[min_i]) min_i = i;
+    else if (corr[i] > best_corr && i > min_i) {
+      best_corr = corr[i];
+      best_offset = i;
+    }
+  }
+
+  if (best_corr < corr[0] * 0.4 || best_offset < 2) return null;
+
+  // Parabolic interpolation
+  const y1 = corr[best_offset-1], y2 = corr[best_offset], y3 = best_offset+1 < MAX_SAMPLES ? corr[best_offset+1] : y2;
+  const refined = best_offset + (y3 - y1) / (2 * (2*y2 - y1 - y3));
+  return sampleRate / refined;
+}
+
+// =============================================
+//  STRING / FRET FINDER
+// =============================================
+function findBestStringFret(midiNote) {
+  let best = null;
+  let bestFret = 999;
+  for (let s = 0; s < 6; s++) {
+    const fret = midiNote - tuning[s];
+    if (fret >= 0 && fret <= 22 && fret < bestFret) {
+      bestFret = fret;
+      best = { string: s, fret };
+    }
+  }
+  // Prefer frets 0-12 on mid strings
+  let preferred = null;
+  let prefScore = 999;
+  for (let s = 0; s < 6; s++) {
+    const fret = midiNote - tuning[s];
+    if (fret >= 0 && fret <= 12) {
+      const score = Math.abs(fret - 5) + s * 0.5;
+      if (score < prefScore) { prefScore = score; preferred = { string: s, fret }; }
+    }
+  }
+  return preferred || best;
+}
+
+// =============================================
+//  RECORDING & AUDIO
+// =============================================
+const waveCanvas = document.getElementById('waveform');
+const wctx = waveCanvas.getContext('2d');
+
+async function toggleRecord() {
+  if (isRecording) stopRecord();
+  else await startRecord();
+}
+
+async function startRecord() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+
+    isRecording = true;
+    document.getElementById('btnRecord').classList.add('recording');
+    document.getElementById('recLabel').textContent = 'Stop Opname';
+    document.getElementById('recIcon').textContent = '■';
+    document.getElementById('statusDot').classList.add('active');
+    document.getElementById('statusText').textContent = 'Aan het opnemen...';
+
+    capturedNotes = [];
+    noteBuffer = [];
+    drawLoop();
+  } catch(e) {
+    alert('Microfoon toegang vereist. Geef toestemming in je browser.');
+  }
+}
+
+function stopRecord() {
+  isRecording = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
+
+  document.getElementById('btnRecord').classList.remove('recording');
+  document.getElementById('recLabel').textContent = 'Start Opname';
+  document.getElementById('recIcon').textContent = '●';
+  document.getElementById('statusDot').classList.remove('active');
+  document.getElementById('statusDot').classList.add('ready');
+  document.getElementById('statusText').textContent = `Klaar — ${capturedNotes.length} noten gevangen`;
+
+  if (capturedNotes.length > 0) {
+    tabNotes = [...capturedNotes];
+    renderTab();
+    document.getElementById('btnPlay').disabled = false;
+    document.getElementById('btnPDF').disabled = false;
+    document.getElementById('btnTXT').disabled = false;
+    document.getElementById('editTip').style.display = 'block';
+  }
+}
+
+function drawLoop() {
+  if (!isRecording) return;
+  animFrame = requestAnimationFrame(drawLoop);
+
+  const bufLen = analyser.frequencyBinCount;
+  const timeData = new Float32Array(bufLen);
+  analyser.getFloatTimeDomainData(timeData);
+
+  // Draw waveform
+  const W = waveCanvas.width = waveCanvas.offsetWidth * window.devicePixelRatio;
+  const H = waveCanvas.height = 70 * window.devicePixelRatio;
+  wctx.clearRect(0,0,W,H);
+  wctx.strokeStyle = 'rgba(212,168,71,0.7)';
+  wctx.lineWidth = 1.5;
+  wctx.beginPath();
+  const step = W / bufLen;
+  for (let i = 0; i < bufLen; i++) {
+    const y = (1 - (timeData[i] * 0.8 + 1) / 2) * H;
+    i === 0 ? wctx.moveTo(0, y) : wctx.lineTo(i * step, y);
+  }
+  wctx.stroke();
+
+  // Detect pitch
+  const freq = detectPitch(timeData, audioCtx.sampleRate);
+  if (freq) {
+    const midi = midiFromFreq(freq);
+    if (midi) {
+      const noteName = NOTES[midi % 12];
+      document.getElementById('pitchNote').textContent = noteName + Math.floor(midi/12-1);
+      document.getElementById('pitchFreq').textContent = Math.round(freq) + ' Hz';
+      const sf = findBestStringFret(midi);
+      if (sf) document.getElementById('pitchFret').textContent = STRING_LABELS[sf.string] + ' / ' + sf.fret;
+
+      // Debounce note capture
+      const now = Date.now();
+      noteBuffer.push(midi);
+      if (noteBuffer.length > 6) noteBuffer.shift();
+      const med = noteBuffer.slice().sort((a,b)=>a-b)[Math.floor(noteBuffer.length/2)];
+
+      if (med !== lastNote || now - lastNoteTime > 400) {
+        if (now - lastNoteTime > 120) {
+          capturedNotes.push(med);
+          lastNote = med;
+          lastNoteTime = now;
+          document.getElementById('noteCount').textContent = capturedNotes.length;
+        }
+      }
+    }
+  }
+}
+
+// =============================================
+//  TAB RENDERING
+// =============================================
+let selectedCell = null;
+
+function renderTab() {
+  const container = document.getElementById('tabDisplay');
+  if (!tabNotes.length) { container.innerHTML = '<div class="empty-state"><div class="icon">🎸</div>Geen noten gevangen</div>'; return; }
+
+  // Build a 6×N grid (string × beat)
+  const grid = Array.from({length:6}, () => Array(tabNotes.length).fill(null));
+  tabNotes.forEach((midi, col) => {
+    const sf = findBestStringFret(midi);
+    if (sf) grid[sf.string][col] = sf.fret;
+  });
+
+  const wrap = document.createElement('div');
+  wrap.className = 'tab-container';
+  const tabGrid = document.createElement('div');
+  tabGrid.className = 'tab-grid';
+  tabGrid.id = 'tabGrid';
+
+  // Spacer row (measure lines every 4)
+  const measures = Math.ceil(tabNotes.length / 4);
+
+  for (let s = 0; s < 6; s++) {
+    const row = document.createElement('div');
+    row.className = 'tab-row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'tab-label';
+    lbl.style.color = STRING_COLORS[s];
+    lbl.textContent = STRING_LABELS[s];
+    row.appendChild(lbl);
+
+    const line = document.createElement('div');
+    line.className = 'tab-line';
+
+    for (let b = 0; b < tabNotes.length; b++) {
+      const beat = document.createElement('div');
+      beat.className = 'tab-beat';
+
+      if (grid[s][b] !== null) {
+        const fn = document.createElement('span');
+        fn.className = 'fret-num';
+        fn.textContent = grid[s][b];
+        fn.style.color = STRING_COLORS[s];
+        fn.dataset.string = s;
+        fn.dataset.beat = b;
+        fn.onclick = () => editFret(fn, s, b, grid);
+        beat.appendChild(fn);
+      } else {
+        const dash = document.createElement('span');
+        dash.className = 'dash';
+        dash.textContent = '─';
+        beat.appendChild(dash);
+      }
+
+      // Measure bar
+      if ((b+1) % 4 === 0 && b < tabNotes.length-1) {
+        const bar = document.createElement('span');
+        bar.style.cssText = 'color:var(--muted);font-size:0.9rem;margin:0 2px;';
+        bar.textContent = '|';
+        beat.appendChild(bar);
+      }
+
+      line.appendChild(beat);
+    }
+    row.appendChild(line);
+    tabGrid.appendChild(row);
+  }
+
+  // Note names row
+  const noteRow = document.createElement('div');
+  noteRow.className = 'tab-row';
+  const nlbl = document.createElement('span');
+  nlbl.className = 'tab-label';
+  nlbl.style.color = 'var(--muted)';
+  nlbl.style.fontSize = '0.65rem';
+  nlbl.textContent = '';
+  noteRow.appendChild(nlbl);
+  const noteLine = document.createElement('div');
+  noteLine.className = 'tab-line';
+  noteLine.style.cssText = 'align-items:flex-end;';
+  tabNotes.forEach((midi, b) => {
+    const nb = document.createElement('div');
+    nb.className = 'tab-beat';
+    nb.style.cssText = 'font-size:0.6rem;color:var(--muted);font-family:"JetBrains Mono";align-items:flex-end;';
+    nb.textContent = NOTES[midi%12];
+    noteLine.appendChild(nb);
+  });
+  noteRow.appendChild(noteLine);
+  tabGrid.appendChild(noteRow);
+
+  wrap.appendChild(tabGrid);
+  container.innerHTML = '';
+  container.appendChild(wrap);
+
+  // Store grid globally for playback
+  window._tabGrid = grid;
+}
+
+function editFret(el, string, beat, grid) {
+  if (selectedCell) selectedCell.classList.remove('active');
+  selectedCell = el;
+  el.classList.add('active');
+  const val = prompt(`Fret voor snaar ${STRING_LABELS[string]}, slag ${beat+1}:`, el.textContent);
+  if (val !== null) {
+    const n = parseInt(val);
+    if (!isNaN(n) && n >= 0 && n <= 22) {
+      el.textContent = n;
+      grid[string][beat] = n;
+      // recalculate midi for this beat
+      tabNotes[beat] = tuning[string] + n;
+    }
+  }
+  el.classList.remove('active');
+  selectedCell = null;
+}
+
+// =============================================
+//  PLAYBACK
+// =============================================
+let isPlaying = false;
+let playTimeout = null;
+let playIndex = 0;
+let bpm = 90;
+
+function updateBPM() {
+  bpm = parseInt(document.getElementById('bpmSlider').value);
+  document.getElementById('bpmVal').textContent = bpm;
+}
+
+function togglePlay() {
+  if (isPlaying) stopPlay();
+  else startPlay();
+}
+
+function startPlay() {
+  if (!tabNotes.length) return;
+  isPlaying = true;
+  playIndex = 0;
+  document.getElementById('btnPlay').textContent = '■ Stop';
+  playNextNote();
+}
+
+function stopPlay() {
+  isPlaying = false;
+  clearTimeout(playTimeout);
+  document.getElementById('btnPlay').textContent = '▶ Afspelen';
+  // Clear playing highlights
+  document.querySelectorAll('.fret-num.playing').forEach(el => el.classList.remove('playing'));
+}
+
+function playNextNote() {
+  if (!isPlaying) return;
+  if (playIndex >= tabNotes.length) { stopPlay(); return; }
+
+  // Highlight current column
+  document.querySelectorAll('.fret-num.playing').forEach(el => el.classList.remove('playing'));
+  document.querySelectorAll(`.fret-num[data-beat="${playIndex}"]`).forEach(el => el.classList.add('playing'));
+
+  // Play sound with Web Audio
+  playTone(tabNotes[playIndex]);
+
+  playIndex++;
+  const interval = (60 / bpm) * 500; // eighth notes
+  playTimeout = setTimeout(playNextNote, interval);
+}
+
+function playTone(midi) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+  } catch(e) {}
+}
+
+// =============================================
+//  EXPORT
+// =============================================
+function exportTXT() {
+  if (!tabNotes.length) return;
+  const lines = [];
+  lines.push('MELODYTAB — Gitaar Tabulatie');
+  lines.push('='.repeat(40));
+  lines.push('');
+  for (let s = 0; s < 6; s++) {
+    let line = STRING_LABELS[s] + '|';
+    const grid = window._tabGrid;
+    for (let b = 0; b < tabNotes.length; b++) {
+      if (grid[s][b] !== null) {
+        const fret = String(grid[s][b]);
+        line += fret.padStart(2,'-') + '-';
+      } else {
+        line += '---';
+      }
+      if ((b+1) % 4 === 0 && b < tabNotes.length-1) line += '|';
+    }
+    line += '|';
+    lines.push(line);
+  }
+  const txt = lines.join('\n');
+  navigator.clipboard.writeText(txt).then(() => alert('ASCII-tab gekopieerd naar klembord!'));
+}
+
+function exportPDF() {
+  if (!tabNotes.length) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  const W = 297, H = 210;
+  const margin = 20;
+
+  // Background
+  doc.setFillColor(15, 14, 12);
+  doc.rect(0, 0, W, H, 'F');
+
+  // Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.setTextColor(212, 168, 71);
+  doc.text('MelodyTab', margin, 20);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(122, 114, 96);
+  doc.text('Gitaar Tabulatie — gegenereerd ' + new Date().toLocaleDateString('nl-NL'), margin, 27);
+
+  // Line under title
+  doc.setDrawColor(51, 50, 40);
+  doc.setLineWidth(0.3);
+  doc.line(margin, 31, W - margin, 31);
+
+  // Tuning info
+  doc.setFontSize(8);
+  doc.setTextColor(122, 114, 96);
+  doc.text('Stemming: ' + tuning.map((m,i) => STRING_LABELS[i] + '=' + midiToName(m)).join('  '), margin, 38);
+
+  // Draw tab
+  const grid = window._tabGrid;
+  const stringH = 12;
+  const startY = 48;
+  const startX = margin + 14;
+  const beatW = 10;
+
+  const strColors = [
+    [212, 168, 71], [201, 150, 106], [143, 191, 106],
+    [106, 171, 207], [176, 143, 201], [201, 106, 128]
+  ];
+
+  for (let s = 0; s < 6; s++) {
+    const y = startY + s * stringH;
+
+    // String label
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...strColors[s]);
+    doc.text(STRING_LABELS[s], margin, y + 1);
+
+    // String line
+    doc.setDrawColor(51, 50, 40);
+    doc.setLineWidth(0.2);
+    doc.line(startX - 2, y, startX + tabNotes.length * beatW + 5, y);
+
+    // Frets
+    for (let b = 0; b < tabNotes.length; b++) {
+      const x = startX + b * beatW;
+      if (grid[s][b] !== null) {
+        doc.setFillColor(26, 25, 22);
+        doc.roundedRect(x - 3, y - 4, 8, 6, 1, 1, 'F');
+        doc.setDrawColor(...strColors[s]);
+        doc.setLineWidth(0.2);
+        doc.roundedRect(x - 3, y - 4, 8, 6, 1, 1, 'S');
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...strColors[s]);
+        doc.text(String(grid[s][b]), x - 1, y + 0.5);
+      }
+
+      // Measure bar
+      if ((b+1) % 4 === 0 && b < tabNotes.length-1) {
+        doc.setDrawColor(70, 68, 58);
+        doc.setLineWidth(0.3);
+        doc.line(startX + (b+1)*beatW, startY - 2, startX + (b+1)*beatW, startY + 5*stringH + 2);
+      }
+    }
+  }
+
+  // Note names
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(80, 75, 60);
+  for (let b = 0; b < tabNotes.length; b++) {
+    const x = startX + b * beatW;
+    doc.text(NOTES[tabNotes[b]%12], x - 2, startY + 6*stringH + 6);
+  }
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setTextColor(50, 48, 40);
+  doc.text('Gemaakt met MelodyTab', W/2, H - 8, { align: 'center' });
+
+  doc.save('melodytab-tabulatie.pdf');
+}
+
+// =============================================
+//  DEMO DATA
+// =============================================
+function loadDemo() {
+  // "Smoke on the Water" riff (approximate)
+  tabNotes = [52,55,57,52,55,58,57,52,55,57,55,52]; // D, G, A, D, G, C, B, D, G, A, G, D approx
+  tabNotes = tabNotes.map(m => {
+    const sf = findBestStringFret(m);
+    return sf ? tuning[sf.string] + sf.fret : m;
+  });
+  tabNotes = [52,55,57,52,55,58,57,52,55,57,55,52];
+  renderTab();
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnPDF').disabled = false;
+  document.getElementById('btnTXT').disabled = false;
+  document.getElementById('editTip').style.display = 'block';
+  document.getElementById('statusDot').classList.add('ready');
+  document.getElementById('statusText').textContent = 'Demo geladen — 12 noten';
+  document.getElementById('noteCount').textContent = tabNotes.length;
+}
+
+// Draw empty waveform on load
+(function initWave() {
+  const W = waveCanvas.width = waveCanvas.offsetWidth * window.devicePixelRatio || 600;
+  const H = waveCanvas.height = 70 * window.devicePixelRatio;
+  wctx.strokeStyle = 'rgba(51,50,40,0.8)';
+  wctx.lineWidth = 1;
+  wctx.beginPath();
+  wctx.moveTo(0, H/2); wctx.lineTo(W, H/2);
+  wctx.stroke();
+})();
+</script>
+</body>
+</html>
