@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MelodyTab — Melodie naar Gitaar Tabulatie</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=JetBrains+Mono:wght@400;500&family=Lato:wght@300;400;700&display=swap');
+
+  :root {
+    --bg:#0f0e0c;--surface:#1a1916;--surface2:#232219;--border:#333228;
+    --accent:#d4a847;--accent2:#8fbf6a;--text:#f0ead6;--muted:#7a7260;
+    --s1:#d4a847;--s2:#c9966a;--s3:#8fbf6a;--s4:#6aabcf;--s5:#b08fc9;--s6:#c96a80;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Lato',sans-serif;font-weight:300;min-height:100vh;overflow-x:hidden;}
+  .grain{position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    opacity:0.4;}
+  .app{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:2rem 1.5rem;}
+  header{text-align:center;padding:2rem 0 2.5rem;border-bottom:1px solid var(--border);margin-bottom:2rem;}
+  header h1{font-family:'Playfair Display',serif;font-size:2.8rem;font-weight:600;letter-spacing:-0.02em;color:var(--accent);margin-bottom:0.4rem;}
+  header p{font-size:0.95rem;color:var(--muted);letter-spacing:0.05em;}
+  .fret-deco{display:flex;justify-content:center;gap:3px;margin-top:1rem;}
+  .fret-deco span{display:block;height:1px;background:var(--border);}
+  .fret-deco span:nth-child(1){width:30px;}
+  .fret-deco span:nth-child(2){width:60px;background:var(--accent);opacity:0.5;}
+  .fret-deco span:nth-child(3){width:30px;}
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;}
+  .section-title{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--accent);margin-bottom:1.2rem;display:flex;align-items:center;gap:10px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+  .controls{display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:1.2rem;}
+  .btn{font-family:'Lato',sans-serif;font-size:0.85rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;padding:0.6rem 1.4rem;border-radius:6px;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;}
+  .btn:active{transform:scale(0.97);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+  .btn-record{background:#c94040;color:#fff;}
+  .btn-record.recording{animation:pulse-rec 1.2s infinite;}
+  @keyframes pulse-rec{0%,100%{box-shadow:0 0 0 0 rgba(201,64,64,0.6);}50%{box-shadow:0 0 0 8px rgba(201,64,64,0);}}
+  .btn-primary{background:var(--accent);color:#0f0e0c;}
+  .btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-success{background:var(--accent2);color:#0f0e0c;}
+  .status{font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;}
+  .dot.active{background:#e05555;animation:blink 1s infinite;}
+  .dot.ready{background:var(--accent2);}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+  .visualizer-wrap{background:var(--surface2);border-radius:8px;border:1px solid var(--border);overflow:hidden;margin-top:1rem;}
+  canvas#waveform{display:block;width:100%;height:70px;}
+  .pitch-display{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 1rem;border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--muted);flex-wrap:wrap;gap:0.5rem;}
+  .pitch-note{font-size:1.4rem;font-weight:500;color:var(--accent);}
+  .playback-bar{display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;}
+  .bpm-group{display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--muted);}
+  .bpm-group input[type=range]{width:80px;accent-color:var(--accent);}
+  .bpm-val{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:0.85rem;min-width:36px;}
+  .tab-actions{display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.2rem;padding-top:1.2rem;border-top:1px solid var(--border);}
+  .fret-edit-tip{font-size:0.75rem;color:var(--muted);margin-top:0.8rem;}
+
+  /* TAB SYSTEM */
+  .tab-system{margin-bottom:1.2rem;overflow-x:auto;}
+  .tab-string-row{display:flex;align-items:center;height:30px;}
+  .tab-str-label{width:22px;flex-shrink:0;font-size:0.78rem;font-weight:600;text-align:right;padding-right:5px;font-family:'JetBrains Mono',monospace;}
+  .tab-str-track{position:relative;height:30px;flex:1;}
+  .tab-str-track::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:var(--border);}
+  .fret-num{position:absolute;top:50%;transform:translateY(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 4px;font-size:0.78rem;font-weight:600;text-align:center;cursor:pointer;transition:border-color 0.1s;font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;min-width:18px;}
+  .fret-num:hover{border-color:var(--accent);}
+  .fret-num.playing{background:var(--accent2);color:#0f0e0c;border-color:var(--accent2);}
+  .measure-bar-line{position:absolute;top:0;bottom:0;width:1px;background:var(--muted);opacity:0.35;}
+  .tab-beat-row{display:flex;align-items:center;height:16px;margin-bottom:8px;}
+  .tab-beat-track{position:relative;height:16px;flex:1;}
+  .beat-num{position:absolute;font-size:0.58rem;color:var(--muted);font-family:'JetBrains Mono',monospace;transform:translateX(-50%);}
+
+  .tab-empty{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:0.9rem;}
+  .tab-empty .icon{font-size:3rem;margin-bottom:1rem;opacity:0.4;}
+  .tab-sep{height:1px;background:var(--border);margin:1rem 0;opacity:0.4;}
+
+  @media(max-width:600px){header h1{font-size:2rem;}.app{padding:1rem;}}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="app">
+
+<header>
+  <h1>MelodyTab</h1>
+  <p>Zing of speel een melodie — ontvang gitaar tabulatie met ritme</p>
+  <div class="fret-deco"><span></span><span></span><span></span></div>
+</header>
+
+<!-- OPNAME -->
+<div class="section">
+  <div class="section-title">Opname</div>
+  <div class="controls">
+    <button class="btn btn-record" id="btnRecord" onclick="toggleRecord()">
+      <span id="recIcon">●</span>
+      <span id="recLabel">Start Opname</span>
+    </button>
+    <div class="status">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">Klaar om op te nemen</span>
+    </div>
+  </div>
+  <div class="visualizer-wrap">
+    <canvas id="waveform"></canvas>
+    <div class="pitch-display">
+      <div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">HUIDIGE NOOT</div>
+        <div class="pitch-note" id="pitchNote">—</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">FREQUENTIE</div>
+        <div id="pitchFreq" style="font-family:'JetBrains Mono';color:var(--muted);">— Hz</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">SNAAR / FRET</div>
+        <div id="pitchFret" style="font-family:'JetBrains Mono';color:var(--accent2);">— / —</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">NOTEN GEVANGEN</div>
+        <div id="noteCount" style="font-family:'JetBrains Mono';color:var(--accent);">0</div>
+      </div>
+    </div>
+  </div>
+  <div style="font-size:0.75rem;color:var(--muted);margin-top:0.6rem;">
+    Ritme wordt opgenomen: de werkelijke timing tussen noten wordt bewaard en teruggespeeld.
+  </div>
+</div>
+
+<!-- TABULATIE -->
+<div class="section">
+  <div class="section-title">Tabulatie</div>
+  <div class="playback-bar">
+    <button class="btn btn-primary" id="btnPlay" onclick="togglePlay()" disabled>▶ Afspelen</button>
+    <button class="btn btn-secondary" onclick="clearTab()">✕ Wis alles</button>
+    <div class="bpm-group">
+      BPM
+      <input type="range" min="40" max="240" value="90" id="bpmSlider" oninput="updateBPM()">
+      <span class="bpm-val" id="bpmVal">90</span>
+    </div>
+    <div id="tempoInfo" style="font-size:0.75rem;color:var(--muted);font-family:'JetBrains Mono';"></div>
+  </div>
+
+  <div id="tabDisplay">
+    <div class="tab-empty">
+      <div class="icon">🎸</div>
+      <div>Neem een melodie op om tabulatie te genereren</div>
+      <div style="margin-top:0.5rem;font-size:0.78rem;">Of klik op <strong style="color:var(--accent)">Demo laden</strong> voor een voorbeeld</div>
+    </div>
+  </div>
+
+  <div class="fret-edit-tip" id="editTip" style="display:none;">💡 Klik op een fret-getal om het handmatig aan te passen</div>
+
+  <div class="tab-actions">
+    <button class="btn btn-secondary" onclick="loadDemo()">🎵 Demo laden</button>
+    <button class="btn btn-success" id="btnPDF" onclick="exportPDF()" disabled>⬇ PDF exporteren</button>
+    <button class="btn btn-secondary" id="btnTXT" onclick="exportTXT()" disabled>📋 ASCII kopiëren</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+// =============================================
+//  CONSTANTS
+// =============================================
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const STRING_LABELS = ['e','B','G','D','A','E'];
+const STRING_COLORS = ['var(--s1)','var(--s2)','var(--s3)','var(--s4)','var(--s5)','var(--s6)'];
+const TUNING = [64,59,55,50,45,40]; // standard, index 0 = high e
+const BEATS_PER_ROW = 16;
+const MIN_NOTE_MS = 80;
+
+// =============================================
+//  STATE
+// =============================================
+let audioCtx, analyser, micSource, micStream;
+let isRecording = false;
+let animFrame;
+let capturedNotes = []; // {midi, startTime, duration}
+let recordStartTime = 0;
+let activeNote = null;
+let pitchBuf = [];
+let tabData = []; // {midi, string, fret, beat, duration_beats, startTime, duration}
+let detectedBPM = 90;
+let bpm = 90;
+
+// Shared playback context
+let playCtx = null;
+function getPlayCtx() {
+  if (!playCtx || playCtx.state === 'closed') {
+    playCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (playCtx.state === 'suspended') playCtx.resume();
+  return playCtx;
+}
+
+// =============================================
+//  PITCH DETECTION (autocorrelation YIN-style)
+// =============================================
+function detectPitch(buf, sr) {
+  const N = buf.length;
+  const half = Math.floor(N / 2);
+  let rms = 0;
+  for (let i = 0; i < N; i++) rms += buf[i]*buf[i];
+  rms = Math.sqrt(rms/N);
+  if (rms < 0.007) return null;
+
+  const ac = new Float32Array(half);
+  for (let lag = 0; lag < half; lag++) {
+    let s = 0;
+    for (let j = 0; j < half; j++) s += buf[j]*buf[j+lag];
+    ac[lag] = s;
+  }
+
+  let valley = 0;
+  for (let i = 1; i < half; i++) { if (ac[i] < ac[valley]) valley = i; else break; }
+
+  let best = -1, bestV = 0;
+  for (let i = valley; i < half; i++) {
+    if (ac[i] > bestV) { bestV = ac[i]; best = i; }
+  }
+  if (best < 2 || bestV < ac[0]*0.38) return null;
+
+  const v1 = ac[best-1], v2 = ac[best], v3 = best+1<half ? ac[best+1] : v2;
+  const refined = best + (v3-v1)/(2*(2*v2-v1-v3));
+  const freq = sr/refined;
+  return (freq >= 60 && freq <= 1400) ? freq : null;
+}
+
+function freqToMidi(f) { return Math.round(12*Math.log2(f/440)+69); }
+
+function bestSF(midi) {
+  let best = null, bestScore = Infinity;
+  for (let s = 0; s < 6; s++) {
+    const fret = midi - TUNING[s];
+    if (fret < 0 || fret > 22) continue;
+    const score = Math.abs(fret-4) + s*0.3;
+    if (score < bestScore) { bestScore = score; best = {string:s, fret}; }
+  }
+  return best;
+}
+
+// =============================================
+//  RECORDING
+// =============================================
+const waveCanvas = document.getElementById('waveform');
+const wctx = waveCanvas.getContext('2d');
+
+async function toggleRecord() {
+  if (isRecording) stopRecord();
+  else await startRecord();
+}
+
+async function startRecord() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}
+    });
+  } catch(e) {
+    alert('Microfoon toegang vereist. Geef toestemming in je browser.');
+    return;
+  }
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 4096;
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  micSource.connect(analyser);
+
+  isRecording = true;
+  recordStartTime = performance.now();
+  capturedNotes = [];
+  activeNote = null;
+  pitchBuf = [];
+
+  document.getElementById('btnRecord').classList.add('recording');
+  document.getElementById('recLabel').textContent = 'Stop Opname';
+  document.getElementById('recIcon').textContent = '■';
+  document.getElementById('statusDot').className = 'dot active';
+  document.getElementById('statusText').textContent = 'Aan het opnemen...';
+  document.getElementById('noteCount').textContent = '0';
+  drawLoop();
+}
+
+function stopRecord() {
+  isRecording = false;
+  cancelAnimationFrame(animFrame);
+  micStream && micStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+
+  // Finalize held note
+  if (activeNote) {
+    const dur = performance.now() - recordStartTime - activeNote.startTime;
+    if (dur >= MIN_NOTE_MS) capturedNotes.push({...activeNote, duration:dur});
+    activeNote = null;
+  }
+
+  document.getElementById('btnRecord').classList.remove('recording');
+  document.getElementById('recLabel').textContent = 'Start Opname';
+  document.getElementById('recIcon').textContent = '●';
+  document.getElementById('statusDot').className = 'dot ready';
+  document.getElementById('statusText').textContent = `Klaar — ${capturedNotes.length} noten gevangen`;
+
+  if (capturedNotes.length > 0) {
+    buildTab();
+    document.getElementById('btnPlay').disabled = false;
+    document.getElementById('btnPDF').disabled = false;
+    document.getElementById('btnTXT').disabled = false;
+    document.getElementById('editTip').style.display = 'block';
+  }
+}
+
+function drawLoop() {
+  if (!isRecording) return;
+  animFrame = requestAnimationFrame(drawLoop);
+
+  const bufLen = analyser.frequencyBinCount;
+  const timeBuf = new Float32Array(bufLen*2);
+  analyser.getFloatTimeDomainData(timeBuf);
+
+  // Waveform
+  const W = waveCanvas.width = (waveCanvas.offsetWidth||400)*devicePixelRatio;
+  const H = waveCanvas.height = 70*devicePixelRatio;
+  wctx.clearRect(0,0,W,H);
+  wctx.strokeStyle='rgba(212,168,71,0.7)';
+  wctx.lineWidth=1.5;
+  wctx.beginPath();
+  const step=W/timeBuf.length;
+  for(let i=0;i<timeBuf.length;i++){
+    const y=(1-(timeBuf[i]*0.8+1)/2)*H;
+    i===0?wctx.moveTo(0,y):wctx.lineTo(i*step,y);
+  }
+  wctx.stroke();
+
+  const freq = detectPitch(timeBuf, audioCtx.sampleRate);
+  const now = performance.now() - recordStartTime;
+
+  if (freq) {
+    const midi = freqToMidi(freq);
+    pitchBuf.push(midi);
+    if (pitchBuf.length > 8) pitchBuf.shift();
+    const med = [...pitchBuf].sort((a,b)=>a-b)[Math.floor(pitchBuf.length/2)];
+
+    document.getElementById('pitchNote').textContent = NOTES[med%12]+Math.floor(med/12-1);
+    document.getElementById('pitchFreq').textContent = Math.round(freq)+' Hz';
+    const sf = bestSF(med);
+    if (sf) document.getElementById('pitchFret').textContent = STRING_LABELS[sf.string]+' / '+sf.fret;
+
+    if (!activeNote) {
+      activeNote = {midi:med, startTime:now};
+    } else if (Math.abs(med - activeNote.midi) > 1) {
+      const dur = now - activeNote.startTime;
+      if (dur >= MIN_NOTE_MS) {
+        capturedNotes.push({midi:activeNote.midi, startTime:activeNote.startTime, duration:dur});
+        document.getElementById('noteCount').textContent = capturedNotes.length;
+      }
+      activeNote = {midi:med, startTime:now};
+    }
+  } else {
+    pitchBuf = [];
+    if (activeNote) {
+      const dur = now - activeNote.startTime;
+      if (dur >= MIN_NOTE_MS) {
+        capturedNotes.push({midi:activeNote.midi, startTime:activeNote.startTime, duration:dur});
+        document.getElementById('noteCount').textContent = capturedNotes.length;
+      }
+      activeNote = null;
+    }
+  }
+}
+
+// =============================================
+//  BUILD TAB — quantize timing to BPM grid
+// =============================================
+function buildTab() {
+  if (!capturedNotes.length) return;
+
+  // Estimate BPM from inter-onset intervals
+  const onsets = capturedNotes.map(n=>n.startTime);
+  if (onsets.length > 2) {
+    const iois = [];
+    for (let i = 1; i < onsets.length; i++) iois.push(onsets[i]-onsets[i-1]);
+    const sorted = [...iois].sort((a,b)=>a-b);
+    const med = sorted[Math.floor(sorted.length/2)];
+    let guess = 60000/med;
+    while (guess > 200) guess /= 2;
+    while (guess < 40) guess *= 2;
+    detectedBPM = Math.round(guess);
+    document.getElementById('bpmSlider').value = detectedBPM;
+    document.getElementById('bpmVal').textContent = detectedBPM;
+    document.getElementById('tempoInfo').textContent = '≈ '+detectedBPM+' BPM gedetecteerd';
+    bpm = detectedBPM;
+  }
+
+  const mpb = 60000/bpm;
+  tabData = capturedNotes.map(n => {
+    const sf = bestSF(n.midi);
+    return {
+      midi: n.midi,
+      string: sf ? sf.string : 0,
+      fret: sf ? sf.fret : 0,
+      beat: n.startTime / mpb,
+      duration_beats: Math.max(0.25, n.duration/mpb),
+      startTime: n.startTime,
+      duration: n.duration
+    };
+  });
+  renderTab();
+}
+
+// =============================================
+//  RENDER TAB — proportional, multi-row
+// =============================================
+function renderTab() {
+  const container = document.getElementById('tabDisplay');
+  if (!tabData.length) {
+    container.innerHTML = '<div class="tab-empty"><div class="icon">🎸</div>Geen noten</div>';
+    return;
+  }
+
+  const last = tabData[tabData.length-1];
+  const totalBeats = Math.ceil(last.beat + last.duration_beats + 1);
+  const numRows = Math.ceil(totalBeats / BEATS_PER_ROW);
+
+  container.innerHTML = '';
+
+  for (let ri = 0; ri < numRows; ri++) {
+    const rowStart = ri * BEATS_PER_ROW;
+    const rowEnd = Math.min(rowStart + BEATS_PER_ROW, totalBeats);
+    const rowSpan = rowEnd - rowStart;
+
+    const system = document.createElement('div');
+    system.className = 'tab-system';
+
+    // 6 string rows
+    for (let s = 0; s < 6; s++) {
+      const row = document.createElement('div');
+      row.className = 'tab-string-row';
+
+      const lbl = document.createElement('span');
+      lbl.className = 'tab-str-label';
+      lbl.style.color = STRING_COLORS[s];
+      lbl.textContent = STRING_LABELS[s];
+      row.appendChild(lbl);
+
+      const track = document.createElement('div');
+      track.className = 'tab-str-track';
+
+      // Measure bar lines
+      const firstBar = Math.ceil(rowStart/4)*4;
+      for (let mb = firstBar; mb <= rowEnd; mb += 4) {
+        if (mb <= rowStart || mb >= rowEnd) continue;
+        const bar = document.createElement('div');
+        bar.className = 'measure-bar-line';
+        bar.style.left = ((mb-rowStart)/rowSpan*100)+'%';
+        track.appendChild(bar);
+      }
+
+      // Notes on this string in this row
+      tabData.filter(n => n.string===s && n.beat < rowEnd && n.beat+n.duration_beats > rowStart)
+        .forEach((n, ni) => {
+          const leftBeat = Math.max(n.beat, rowStart) - rowStart;
+          const leftPct = (leftBeat/rowSpan)*100;
+          const widthPct = Math.max(2, Math.min(
+            (n.duration_beats/rowSpan)*95,
+            ((rowEnd-rowStart-leftBeat)/rowSpan)*95
+          ));
+
+          const fn = document.createElement('div');
+          fn.className = 'fret-num';
+          fn.textContent = n.fret;
+          fn.style.left = leftPct+'%';
+          fn.style.width = widthPct+'%';
+          fn.style.color = STRING_COLORS[s];
+          fn.dataset.noteIndex = tabData.indexOf(n);
+          fn.onclick = () => editNote(fn, tabData.indexOf(n));
+          track.appendChild(fn);
+        });
+
+      row.appendChild(track);
+      system.appendChild(row);
+    }
+
+    // Beat numbers row
+    const beatRowEl = document.createElement('div');
+    beatRowEl.className = 'tab-beat-row';
+    const beatLbl = document.createElement('span');
+    beatLbl.className = 'tab-str-label';
+    beatRowEl.appendChild(beatLbl);
+    const beatTrack = document.createElement('div');
+    beatTrack.className = 'tab-beat-track';
+    for (let b = rowStart; b < rowEnd; b++) {
+      if (b % 2 === 0) {
+        const bn = document.createElement('span');
+        bn.className = 'beat-num';
+        bn.style.left = ((b-rowStart)/rowSpan*100)+'%';
+        bn.textContent = b % 4 === 0 ? String(b+1) : '·';
+        if (b % 4 === 0) bn.style.color = 'var(--muted)';
+        else bn.style.opacity = '0.4';
+        beatTrack.appendChild(bn);
+      }
+    }
+    beatRowEl.appendChild(beatTrack);
+    system.appendChild(beatRowEl);
+
+    if (ri < numRows-1) {
+      const sep = document.createElement('div');
+      sep.className = 'tab-sep';
+      system.appendChild(sep);
+    }
+
+    container.appendChild(system);
+  }
+}
+
+function editNote(el, idx) {
+  const n = tabData[idx];
+  if (!n) return;
+  const val = prompt(`Fret voor snaar ${STRING_LABELS[n.string]}, noot ${idx+1}:`, n.fret);
+  if (val !== null) {
+    const fret = parseInt(val);
+    if (!isNaN(fret) && fret >= 0 && fret <= 22) {
+      tabData[idx].fret = fret;
+      tabData[idx].midi = TUNING[n.string]+fret;
+      el.textContent = fret;
+    }
+  }
+}
+
+// =============================================
+//  CLEAR
+// =============================================
+function clearTab() {
+  stopPlay();
+  tabData = [];
+  capturedNotes = [];
+  document.getElementById('tabDisplay').innerHTML =
+    '<div class="tab-empty"><div class="icon">🎸</div><div>Neem een melodie op om tabulatie te genereren</div><div style="margin-top:0.5rem;font-size:0.78rem;">Of klik op <strong style="color:var(--accent)">Demo laden</strong> voor een voorbeeld</div></div>';
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('btnPDF').disabled = true;
+  document.getElementById('btnTXT').disabled = true;
+  document.getElementById('editTip').style.display = 'none';
+  document.getElementById('noteCount').textContent = '0';
+  document.getElementById('statusDot').className = 'dot';
+  document.getElementById('statusText').textContent = 'Klaar om op te nemen';
+  document.getElementById('tempoInfo').textContent = '';
+  document.getElementById('pitchNote').textContent = '—';
+  document.getElementById('pitchFreq').textContent = '— Hz';
+  document.getElementById('pitchFret').textContent = '— / —';
+}
+
+// =============================================
+//  PLAYBACK — Web Audio API scheduled, stable
+// =============================================
+let isPlaying = false;
+let playTimeouts = [];
+let scheduledNodes = [];
+
+function updateBPM() {
+  bpm = parseInt(document.getElementById('bpmSlider').value);
+  document.getElementById('bpmVal').textContent = bpm;
+}
+
+function togglePlay() {
+  if (isPlaying) stopPlay();
+  else startPlay();
+}
+
+function startPlay() {
+  if (!tabData.length) return;
+  stopPlay();
+  isPlaying = true;
+  document.getElementById('btnPlay').textContent = '■ Stop';
+  bpm = parseInt(document.getElementById('bpmSlider').value);
+
+  const ctx = getPlayCtx();
+  const mpb = 60000/bpm;
+  scheduledNodes = [];
+  playTimeouts = [];
+
+  tabData.forEach((n, i) => {
+    const delayMs = n.beat * mpb;
+    const durMs = Math.max(120, n.duration_beats * mpb * 0.88);
+    const startSec = ctx.currentTime + delayMs/1000;
+    const durSec = durMs/1000;
+    const freq = 440*Math.pow(2,(n.midi-69)/12);
+
+    // Scheduled audio — perfectly timed
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, startSec);
+    gain.gain.linearRampToValueAtTime(0.25, startSec+0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, startSec+durSec);
+    osc.start(startSec);
+    osc.stop(startSec+durSec+0.05);
+    scheduledNodes.push(osc);
+
+    // Visual highlight (setTimeout is fine for visuals)
+    const t = setTimeout(() => {
+      document.querySelectorAll('.fret-num.playing').forEach(el=>el.classList.remove('playing'));
+      document.querySelectorAll(`.fret-num[data-note-index="${i}"]`).forEach(el=>el.classList.add('playing'));
+    }, delayMs);
+    playTimeouts.push(t);
+  });
+
+  const last = tabData[tabData.length-1];
+  const endMs = (last.beat+last.duration_beats)*mpb+300;
+  const endT = setTimeout(()=>stopPlay(), endMs);
+  playTimeouts.push(endT);
+}
+
+function stopPlay() {
+  isPlaying = false;
+  playTimeouts.forEach(t=>clearTimeout(t));
+  playTimeouts = [];
+  scheduledNodes.forEach(n=>{try{n.stop();}catch(e){}});
+  scheduledNodes = [];
+  document.getElementById('btnPlay').textContent = '▶ Afspelen';
+  document.querySelectorAll('.fret-num.playing').forEach(el=>el.classList.remove('playing'));
+}
+
+// =============================================
+//  EXPORT ASCII
+// =============================================
+function exportTXT() {
+  if (!tabData.length) return;
+  const mpb = 60000/bpm;
+  const gridRes = 0.5;
+  const last = tabData[tabData.length-1];
+  const cols = Math.ceil((last.beat+last.duration_beats+1)/gridRes);
+  const grid = Array.from({length:6},()=>Array(cols).fill(null));
+  tabData.forEach(n => {
+    const col = Math.round(n.beat/gridRes);
+    if (col >= 0 && col < cols) grid[n.string][col] = n.fret;
+  });
+
+  const COLS_PER = 32;
+  const lines = ['MelodyTab — Gitaar Tabulatie','='.repeat(50),`BPM: ${bpm}`,''];
+  for (let start = 0; start < cols; start += COLS_PER) {
+    const end = Math.min(start+COLS_PER, cols);
+    for (let s = 0; s < 6; s++) {
+      let line = STRING_LABELS[s]+'|';
+      for (let c = start; c < end; c++) {
+        const v = grid[s][c];
+        line += v!==null ? String(v).padStart(2,'─') : '──';
+        if ((c+1)%(4/gridRes)===0) line += '|';
+      }
+      lines.push(line);
+    }
+    lines.push('');
+  }
+
+  const txt = lines.join('\n');
+  navigator.clipboard.writeText(txt)
+    .then(()=>alert('ASCII-tab gekopieerd naar klembord!'))
+    .catch(()=>prompt('Kopieer de tab:', txt));
+}
+
+// =============================================
+//  EXPORT PDF — white background, multi-row, printable
+// =============================================
+function exportPDF() {
+  if (!tabData.length) return;
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=297, H=210, margin=14;
+
+  // White background
+  doc.setFillColor(255,255,255);
+  doc.rect(0,0,W,H,'F');
+
+  // Title
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(16);
+  doc.setTextColor(40,40,40);
+  doc.text('MelodyTab',margin,14);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.setTextColor(120,120,120);
+  doc.text('Gitaar Tabulatie  ·  '+new Date().toLocaleDateString('nl-NL')+'  ·  '+bpm+' BPM  ·  Standaard EADGBE', margin,20);
+  doc.setDrawColor(200,200,200);
+  doc.setLineWidth(0.3);
+  doc.line(margin,23,W-margin,23);
+
+  // String colors for print (dark enough on white)
+  const strClr = [[140,90,0],[130,70,20],[40,110,30],[20,90,150],[80,40,140],[150,30,60]];
+
+  const contentW = W-2*margin;
+  const last = tabData[tabData.length-1];
+  const totalBeats = Math.ceil(last.beat+last.duration_beats+1);
+
+  // How many rows fit on page?
+  const firstY = 28;
+  const strH = 6; // mm per string
+  const sysH = 6*strH+10; // 6 strings + beat row + gap
+  const maxSys = Math.floor((H-firstY-10)/sysH);
+  const beatsPerRow = Math.ceil(totalBeats/Math.max(1,Math.min(maxSys,Math.ceil(totalBeats/BEATS_PER_ROW))));
+
+  let si = 0;
+  for (let rowStart=0; rowStart<totalBeats; rowStart+=beatsPerRow) {
+    if (si >= maxSys) break;
+    const rowEnd = Math.min(rowStart+beatsPerRow, totalBeats);
+    const rowSpan = rowEnd-rowStart;
+    const sysY = firstY+si*sysH;
+    const lineX = margin+6;
+    const lineW = contentW-6;
+    const ppb = lineW/rowSpan; // mm per beat
+
+    for (let s=0; s<6; s++) {
+      const sy = sysY+s*strH;
+      // Label
+      doc.setFont('courier','bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...strClr[s]);
+      doc.text(STRING_LABELS[s], margin, sy+1.5);
+      // String line
+      doc.setDrawColor(210,210,210);
+      doc.setLineWidth(0.15);
+      doc.line(lineX,sy,lineX+lineW,sy);
+      // Notes
+      tabData.filter(n=>n.string===s&&n.beat<rowEnd&&n.beat>=rowStart).forEach(n=>{
+        const nx = lineX+(n.beat-rowStart)*ppb;
+        const nw = Math.max(3.5, Math.min(n.duration_beats*ppb*0.82, lineW-(nx-lineX)-0.5));
+        doc.setFillColor(248,248,248);
+        doc.setDrawColor(...strClr[s]);
+        doc.setLineWidth(0.2);
+        doc.roundedRect(nx-0.5,sy-2.8,nw,4,0.4,0.4,'FD');
+        doc.setFont('courier','bold');
+        doc.setFontSize(6);
+        doc.setTextColor(...strClr[s]);
+        doc.text(String(n.fret), nx+0.3, sy+0.8);
+      });
+    }
+
+    // Measure bars (vertical lines through all strings)
+    const firstBar = Math.ceil(rowStart/4)*4;
+    for (let mb=firstBar; mb<rowEnd; mb+=4) {
+      if (mb<=rowStart) continue;
+      const bx = lineX+(mb-rowStart)*ppb;
+      doc.setDrawColor(160,160,160);
+      doc.setLineWidth(0.25);
+      doc.line(bx,sysY-1, bx, sysY+5*strH+1);
+    }
+
+    // Beat numbers
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(5);
+    doc.setTextColor(150,150,150);
+    for (let b=rowStart; b<rowEnd; b++) {
+      if (b%4===0) {
+        doc.text(String(b+1), lineX+(b-rowStart)*ppb, sysY+6*strH+3);
+      }
+    }
+
+    si++;
+  }
+
+  // Footer
+  doc.setFontSize(6);
+  doc.setTextColor(180,180,180);
+  doc.text('Gemaakt met MelodyTab', W/2, H-5, {align:'center'});
+  doc.save('melodytab-tabulatie.pdf');
+}
+
+// =============================================
+//  DEMO — Smoke on the Water met correct ritme
+// =============================================
+function loadDemo() {
+  const demoBPM = 100;
+  const mpb = 60000/demoBPM;
+  const rawNotes = [
+    [52,0,0.5],[55,0.5,0.5],[57,1,1.0],
+    [52,2,0.5],[55,2.5,0.5],[58,3,0.5],[57,3.5,1.5],
+    [52,5,0.5],[55,5.5,0.5],[57,6,1.0],
+    [55,7,0.5],[52,7.5,1.5]
+  ];
+  capturedNotes = rawNotes.map(([midi,beat,dur])=>({midi,startTime:beat*mpb,duration:dur*mpb}));
+  detectedBPM = demoBPM; bpm = demoBPM;
+  document.getElementById('bpmSlider').value = demoBPM;
+  document.getElementById('bpmVal').textContent = demoBPM;
+  document.getElementById('tempoInfo').textContent = '≈ '+demoBPM+' BPM (demo)';
+  buildTab();
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnPDF').disabled = false;
+  document.getElementById('btnTXT').disabled = false;
+  document.getElementById('editTip').style.display = 'block';
+  document.getElementById('statusDot').className = 'dot ready';
+  document.getElementById('statusText').textContent = 'Demo geladen — '+capturedNotes.length+' noten';
+  document.getElementById('noteCount').textContent = capturedNotes.length;
+}
+
+// =============================================
+//  INIT
+// =============================================
+(function(){
+  const W=waveCanvas.width=(waveCanvas.offsetWidth||500)*devicePixelRatio;
+  const H=waveCanvas.height=70*devicePixelRatio;
+  wctx.strokeStyle='rgba(51,50,40,0.8)';
+  wctx.lineWidth=1;
+  wctx.beginPath();
+  wctx.moveTo(0,H/2);wctx.lineTo(W,H/2);
+  wctx.stroke();
+})();
+</script>
+</body>
+</html>
